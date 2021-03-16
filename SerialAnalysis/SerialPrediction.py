@@ -30,8 +30,8 @@ print('=============== START ===============');
 ########################################################
 ## Quick Options
 ########################################################
-variant_names = ['TEST', 'TESTA']; #name - e.g., BTC
-variant_rawCurrency = ['USD', 'USD']; #native or raw currency type of data input - e.g., USD
+variant_names = ['TESTA']; #name - e.g., BTC
+variant_rawCurrency = ['USD']; #native or raw currency type of data input - e.g., USD
 #1440m = 1day, 10080m = 7.5days, 43200m = 30days.
 variant_timeScales = [10, 60, 720, 1440]; #time scale in mins - e.g., 5 min per tick. Each value must be divisible by the minimum value without remainder.
 variant_tickWindows = [100]; #tick window in the unit of timeScale - e.g., 10 ticks of timeScale units.
@@ -40,7 +40,7 @@ variant_tickWindows = [100]; #tick window in the unit of timeScale - e.g., 10 ti
 ## Classes
 ########################################################
 class VariantData(): #variant data
-    def __init__(self, name, rawCurrency, timeScales, tickWindows, debugoNoiseValues, rawValues, linRegressValues, movingAverageValues, movingSDValues, movingPeaks, movingSupports, linRegressPeaks, linRegressSupports, fHat, fPSD, fDist, fPSDFilteredHat, fInverseValues, FIRFilteredValues, fHilb, fAmpEnv, fInstPhase, fInstFreq):
+    def __init__(self, name, rawCurrency, timeScales, tickWindows, debugoNoiseValues, rawValues, linRegressValues, movingAverageValues, movingSDValues, staticPeaks, staticSupports, linRegressPeaks, linRegressSupports, fHat, fPSD, fDist, fPSDFilteredHat, fInverseValues, FIRFilteredValues, fHilb, fAmpEnv, fInstPhase, fInstFreq):
         self.name = name; #name/identifier - e.g., BTC
         self.rawCurrency = rawCurrency; #native currency type - e.g., USD
         self.timeScales = timeScales; #time scale - e.g., 5 min per tick
@@ -50,8 +50,8 @@ class VariantData(): #variant data
         self.linRegressValues = linRegressValues;
         self.movingAverageValues = movingAverageValues;
         self.movingSDValues = movingSDValues;
-        self.movingPeaks = movingPeaks;
-        self.movingSupports = movingSupports;
+        self.staticPeaks = staticPeaks;
+        self.staticSupports = staticSupports;
         self.linRegressPeaks = linRegressPeaks;
         self.linRegressSupports = linRegressSupports;
         self.fHat = fHat;
@@ -89,10 +89,10 @@ for var in range(len(variant_names)):
     init_movingAverageValues[:] = np.NaN;
     init_movingSDValues = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
     init_movingSDValues[:] = np.NaN;
-    init_movingPeaks = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
-    init_movingPeaks[:] = np.NaN;
-    init_movingSupports = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
-    init_movingSupports[:] = np.NaN;
+    init_staticPeaks = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
+    init_staticPeaks[:] = np.NaN;
+    init_staticSupports = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
+    init_staticSupports[:] = np.NaN;
     init_linRegressPeaks = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
     init_linRegressPeaks[:] = np.NaN;
     init_linRegressSupports = np.empty((len(variant_timeScales), len(np.arange(2, variant_tickWindows[0] * .25, 2)), variant_tickWindows[0]));
@@ -117,7 +117,7 @@ for var in range(len(variant_names)):
     init_fInstPhase[:] = np.NaN;
     init_fInstFreq = np.empty((len(variant_timeScales), variant_tickWindows[0]), dtype = 'complex_');
     init_fInstFreq[:] = np.NaN;
-    variantData[var] = VariantData(init_name, init_rawCurrency, init_timeScales, init_timeWindows, init_debugoNoiseValues, init_rawValues, init_linRegressValues, init_movingAverageValues, init_movingSDValues, init_movingPeaks, init_movingSupports, init_linRegressPeaks, init_linRegressSupports, init_fHat, init_fPSD, init_fDist, init_fPSDFilteredHat, init_fInverseValues, init_FIRFilteredValues, init_fHilb, init_fAmpEnv, init_fInstPhase, init_fInstFreq);
+    variantData[var] = VariantData(init_name, init_rawCurrency, init_timeScales, init_timeWindows, init_debugoNoiseValues, init_rawValues, init_linRegressValues, init_movingAverageValues, init_movingSDValues, init_staticPeaks, init_staticSupports, init_linRegressPeaks, init_linRegressSupports, init_fHat, init_fPSD, init_fDist, init_fPSDFilteredHat, init_fInverseValues, init_FIRFilteredValues, init_fHilb, init_fAmpEnv, init_fInstPhase, init_fInstFreq);
 
     ########################################################
     ## Generate/Import Variant's rawData
@@ -173,6 +173,10 @@ for var in range(len(variant_names)):
             elif int(variant_timeScales[timeScale] / min(variant_timeScales)) > 1:
                 variantData[var].debugoNoiseValues[timeScale][value] = np.mean(oNoiseValues[tempIndex : tempIndex + int(variant_timeScales[timeScale] / min(variant_timeScales))]);
                 variantData[var].rawValues[timeScale][value] += np.mean(oNoiseValues[tempIndex : tempIndex + int(variant_timeScales[timeScale] / min(variant_timeScales))]);
+    
+    # Add rising/falling trend
+    
+    
     t1 = time.time();
     print(str(t1-t0));
 
@@ -180,7 +184,7 @@ for var in range(len(variant_names)):
     ## Prepare Output Structures
     ########################################################
     # Plot Structures
-    numSubPlots = 9;
+    numSubPlots = 10;
     fig, axs = plt.subplots(numSubPlots,len(variant_timeScales), dpi=300);
     #plt.style.use('ggplot');
 
@@ -204,12 +208,16 @@ for var in range(len(variant_names)):
         axs[2,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
 
         axs[3,timeScale].plot(variantData[var].rawValues[timeScale], color='dimgrey', alpha=0.3);
-        axs[3,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='Extr');
+        axs[3,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='P&S');
         axs[3,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
 
-        axs[7,timeScale].plot(variantData[var].rawValues[timeScale], color='dimgrey', alpha=0.3);
-        axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='fftInv');
-        axs[7,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
+        axs[4,timeScale].plot(variantData[var].rawValues[timeScale], color='dimgrey', alpha=0.3);
+        axs[4,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='P&S r');
+        axs[4,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
+
+        axs[8,timeScale].plot(variantData[var].rawValues[timeScale], color='dimgrey', alpha=0.3);
+        axs[8,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='fftInv');
+        axs[8,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
 
     t1 = time.time();
     print(str(t1-t0));
@@ -234,14 +242,14 @@ for var in range(len(variant_names)):
     print(str(t1-t0));
 
     ########################################################
-    ## Output Moving Average +/- SD (Bollinger Bands)
+    ## Output Moving Average +/- SD (Bollinger Bands) # NOTE: SD values independently for each FIRTickWindows, instead of global SD?
     ########################################################
     t0 = time.time();
     print('Output Moving Average +/- SD (Bollinger Bands)');
     def moving_average(x, w):
         return np.convolve(x, np.ones(w), 'valid') / w;
 
-    FIRTickWindows = np.arange(3, variant_tickWindows[0] * .25, 2, dtype='int');
+    FIRTickWindows = np.arange(5, variant_tickWindows[0] * .25, 2, dtype='int');
     # Simple Moving Average of Native Currency
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
@@ -253,9 +261,9 @@ for var in range(len(variant_names)):
     # Plot SMA +/- SD
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
-            axs[2,timeScale].plot(variantData[var].movingAverageValues[timeScale][tickWindowIndex], color='teal', alpha=0.1); #plot simpleMovingAverage
-            axs[2,timeScale].plot(variantData[var].movingAverageValues[timeScale][tickWindowIndex] + variantData[var].movingSDValues[timeScale][tickWindowIndex], '-', linewidth=1, color='teal', alpha=0.05); #plot simpleMovingAverage + SD
-            axs[2,timeScale].plot(variantData[var].movingAverageValues[timeScale][tickWindowIndex] - variantData[var].movingSDValues[timeScale][tickWindowIndex], '-', linewidth=1, color='teal', alpha=0.05); #plot simpleMovingAverage - SD
+            axs[2,timeScale].plot(variantData[var].movingAverageValues[timeScale][tickWindowIndex], color='teal', alpha=0.15); #plot simpleMovingAverage
+            axs[2,timeScale].plot(variantData[var].movingAverageValues[timeScale][tickWindowIndex] + variantData[var].movingSDValues[timeScale][tickWindowIndex], '-', linewidth=1, color='teal', alpha=0.15); #plot simpleMovingAverage + SD
+            axs[2,timeScale].plot(variantData[var].movingAverageValues[timeScale][tickWindowIndex] - variantData[var].movingSDValues[timeScale][tickWindowIndex], '-', linewidth=1, color='teal', alpha=0.15); #plot simpleMovingAverage - SD
 
     t1 = time.time();
     print(str(t1-t0));
@@ -265,47 +273,60 @@ for var in range(len(variant_names)):
     ########################################################
     t0 = time.time();
     print('Output Peaks and Supports (values in movingAverage windows that are outside of 95% CI)');
-    # Find Pseudo Peaks and Supports
+    # Find Static Peaks and Supports
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
             tickWindowSize = FIRTickWindows[tickWindowIndex];
             for value in range(0,variant_tickWindows[0] - tickWindowIndex):
                 if variantData[var].rawValues[timeScale][value] > variantData[var].movingAverageValues[timeScale][tickWindowIndex][value] + variantData[var].movingSDValues[timeScale][tickWindowIndex][value]:
-                    variantData[var].movingPeaks[timeScale][tickWindowIndex][value] = variantData[var].rawValues[timeScale][value]; # peaks
+                    variantData[var].staticPeaks[timeScale][tickWindowIndex][value] = variantData[var].rawValues[timeScale][value]; # peaks
                 if variantData[var].rawValues[timeScale][value] < variantData[var].movingAverageValues[timeScale][tickWindowIndex][value] - variantData[var].movingSDValues[timeScale][tickWindowIndex][value]:
-                    variantData[var].movingSupports[timeScale][tickWindowIndex][value] = variantData[var].rawValues[timeScale][value]; # supports
+                    variantData[var].staticSupports[timeScale][tickWindowIndex][value] = variantData[var].rawValues[timeScale][value]; # supports
     
-    # Plot Pseudo Peaks and Supports
+    # Plot Static Peaks and Supports
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
-            axs[3,timeScale].plot(variantData[var].movingPeaks[timeScale][tickWindowIndex], '.', linewidth=1, markersize=1, color='skyblue', alpha=0.8); #plot simpleMovingAverage + SD
-            axs[3,timeScale].plot(variantData[var].movingSupports[timeScale][tickWindowIndex], '.', linewidth=1, markersize=1, color='steelblue', alpha=0.8); #plot simpleMovingAverage - SD
+            axs[3,timeScale].plot(variantData[var].staticPeaks[timeScale][tickWindowIndex], '.', linewidth=1, markersize=1, color='skyblue', alpha=0.8); #plot simpleMovingAverage + SD
+            axs[3,timeScale].plot(variantData[var].staticSupports[timeScale][tickWindowIndex], '.', linewidth=1, markersize=1, color='steelblue', alpha=0.8); #plot simpleMovingAverage - SD
     
     t1 = time.time();
     print(str(t1-t0));
     
     ########################################################
-    ## Output r for Peaks and Supports **************FIX*****************??
+    ## Output r for Peaks and Supports
     ########################################################
+    t0 = time.time();
+    print('Output r for Peaks and Supports');
     # r for Peaks and Supports
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
             tickWindowSize = FIRTickWindows[tickWindowIndex];
             linRegressPeaks = np.NaN;
-            linRegressPeaksLength = len(variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])])
-            if len(np.unique(np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex]))) > 1:
-                linRegressPeaks = sp.stats.linregress(np.arange(0,len(variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])])), variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])]);
+            linRegressPeaksLength = len(variantData[var].staticPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticPeaks[timeScale][tickWindowIndex])])
+            if len(np.unique(np.isnan(variantData[var].staticPeaks[timeScale][tickWindowIndex]))) > 1:
+                linRegressPeaks = sp.stats.linregress(np.arange(0,len(variantData[var].staticPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticPeaks[timeScale][tickWindowIndex])])), variantData[var].staticPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticPeaks[timeScale][tickWindowIndex])]);
             linRegressSupports = np.NaN;
-            linRegressSupportsLength = len(variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])]);
-            if len(np.unique(np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex]))) > 1:
-                linRegressSupports = sp.stats.linregress(np.arange(0,len(variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])])), variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])]);
-
+            linRegressSupportsLength = len(variantData[var].staticSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticSupports[timeScale][tickWindowIndex])]);
+            if len(np.unique(np.isnan(variantData[var].staticSupports[timeScale][tickWindowIndex]))) > 1:
+                linRegressSupports = sp.stats.linregress(np.arange(0,len(variantData[var].staticSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticSupports[timeScale][tickWindowIndex])])), variantData[var].staticSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticSupports[timeScale][tickWindowIndex])]);
+            realPeakIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticPeaks[timeScale][tickWindowIndex])) if x]
+            realSupportIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticSupports[timeScale][tickWindowIndex])) if x]
+            if realPeakIndeces:
+                for t in range(realPeakIndeces[len(realPeakIndeces)-1]-realPeakIndeces[0]):
+                    variantData[var].linRegressPeaks[timeScale][tickWindowIndex][realPeakIndeces[0] + t] = linRegressPeaks[1] + ((linRegressPeaks[0] * t) * len(realPeakIndeces) / len(range(realPeakIndeces[len(realPeakIndeces)-1]-realPeakIndeces[0])));
+            if realSupportIndeces:
+                for t in range(realSupportIndeces[len(realSupportIndeces)-1]-realSupportIndeces[0]):
+                    variantData[var].linRegressSupports[timeScale][tickWindowIndex][realSupportIndeces[0] + t] = linRegressSupports[1] + ((linRegressSupports[0] * t) * len(realSupportIndeces) / len(range(realSupportIndeces[len(realSupportIndeces)-1]-realSupportIndeces[0])));
+            
     # Plot r for peaks and Supports
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
             tickWindowSize = FIRTickWindows[tickWindowIndex];
-            axs[3,timeScale].plot(variantData[var].linRegressPeaks[timeScale][tickWindowIndex], color='skyblue', alpha=0.2);
-            axs[3,timeScale].plot(variantData[var].linRegressSupports[timeScale][tickWindowIndex], color='steelblue', alpha=0.2);
+            axs[4,timeScale].plot(variantData[var].linRegressPeaks[timeScale][tickWindowIndex], color='skyblue', alpha=0.5);
+            axs[4,timeScale].plot(variantData[var].linRegressSupports[timeScale][tickWindowIndex], color='steelblue', alpha=0.5);
+            
+    t1 = time.time();
+    print(str(t1-t0));
             
     ########################################################
     ## Output Fast Fourier Transform (FFT), Power Spectrum Density (fPSD), Frequency Distribution (fDist)
@@ -327,21 +348,21 @@ for var in range(len(variant_names)):
     for timeScale in range(len(variant_timeScales)):
         fs = 1/(variant_timeScales[timeScale] * 60); #frequency of sample (in Hz)
         nyq = fs * 0.5; #nyquist
-        axs[4,timeScale].plot(variantData[var].fHat[timeScale], color='teal', alpha=0.8);
-        axs[4,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='fftHat');
-        axs[4,timeScale].set_ylim([np.min(variantData[var].fHat) - np.std([np.min(variantData[var].fHat), np.max(variantData[var].fHat)]) * .5, np.max(variantData[var].fHat) + np.std([np.min(variantData[var].fHat), np.max(variantData[var].fHat)]) * .5]);
+        axs[5,timeScale].plot(variantData[var].fHat[timeScale], color='teal', alpha=0.8);
+        axs[5,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='fftHat');
+        axs[5,timeScale].set_ylim([np.min(variantData[var].fHat) - np.std([np.min(variantData[var].fHat), np.max(variantData[var].fHat)]) * .5, np.max(variantData[var].fHat) + np.std([np.min(variantData[var].fHat), np.max(variantData[var].fHat)]) * .5]);
         
     # Plot fftL fDist vs. fPSD (except first value)
     for timeScale in range(len(variant_timeScales)):
         fs = 1/(variant_timeScales[timeScale] * 60); #frequency of sample (in Hz)
         nyq = fs * 0.5; #nyquist
-        axs[5,timeScale].plot(variantData[var].fDist[timeScale][1:], variantData[var].fPSD[timeScale][1:], color='teal', alpha=0.8);
-        axs[5,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='fftL');
-        axs[5,timeScale].set_ylim([np.min(variantData[var].fPSD) - np.std([np.min(variantData[var].fPSD), (np.max(variantData[var].fPSD) - np.max(variantData[var].fPSD) * .95)]) * .5, (np.max(variantData[var].fPSD) - np.max(variantData[var].fPSD) * .95) + np.std([np.min(variantData[var].fPSD), (np.max(variantData[var].fPSD) - np.max(variantData[var].fPSD) * .95)]) * .5]);
+        axs[6,timeScale].plot(variantData[var].fDist[timeScale][1:], variantData[var].fPSD[timeScale][1:], color='teal', alpha=0.8);
+        axs[6,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='fftL');
+        axs[6,timeScale].set_ylim([np.min(variantData[var].fPSD) - np.std([np.min(variantData[var].fPSD), (np.max(variantData[var].fPSD) - np.max(variantData[var].fPSD) * .95)]) * .5, (np.max(variantData[var].fPSD) - np.max(variantData[var].fPSD) * .95) + np.std([np.min(variantData[var].fPSD), (np.max(variantData[var].fPSD) - np.max(variantData[var].fPSD) * .95)]) * .5]);
         # Plot nyquist line
-        axs[5,timeScale].axvline(x=nyq, color='violet', alpha=0.8);
+        axs[6,timeScale].axvline(x=nyq, color='violet', alpha=0.8);
         # Plot Hat/Inverse Filtering cutoff lines
-        axs[5,timeScale].axhline(y=np.mean(variantData[var].fPSD[timeScale]) * .6, color='violet', alpha=0.8);
+        axs[6,timeScale].axhline(y=np.mean(variantData[var].fPSD[timeScale]) * .6, color='violet', alpha=0.8);
         
     t1 = time.time();
     print(str(t1-t0));
@@ -358,15 +379,15 @@ for var in range(len(variant_names)):
 
     # Plot Debug Oscillation Noise Only
     for timeScale in range(len(variant_timeScales)):
-        axs[6,timeScale].plot(variantData[var].debugoNoiseValues[timeScale], color='deepskyblue', alpha=0.8);
-        axs[6,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
-        axs[6,timeScale].set_ylim([np.min(variantData[var].debugoNoiseValues) - np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) *.5, np.max(variantData[var].debugoNoiseValues) + np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) * .5]);
+        axs[7,timeScale].plot(variantData[var].debugoNoiseValues[timeScale], color='deepskyblue', alpha=0.8);
+        axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
+        axs[7,timeScale].set_ylim([np.min(variantData[var].debugoNoiseValues) - np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) *.5, np.max(variantData[var].debugoNoiseValues) + np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) * .5]);
 
     # Plot Inverse Values
     for timeScale in range(len(variant_timeScales)):
-        axs[7,timeScale].plot(variantData[var].fInverseValues[timeScale], color='teal', alpha=0.8);
-        axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='ifft');
-        axs[7,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
+        axs[8,timeScale].plot(variantData[var].fInverseValues[timeScale], color='teal', alpha=0.8);
+        axs[8,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='ifft');
+        axs[8,timeScale].set_ylim([np.min(variantData[var].rawValues) - np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) *.5, np.max(variantData[var].rawValues) + np.std([np.min(variantData[var].rawValues), np.max(variantData[var].rawValues)]) * .5]);
 
     t1 = time.time();
     print(str(t1-t0));
@@ -397,9 +418,9 @@ for var in range(len(variant_names)):
     # Plot FIR Filtered rawValues
     for timeScale in range(len(variant_timeScales)):
         for tickWindowIndex in range(len(FIRTickWindows)):
-            axs[8,timeScale].plot(variantData[var].FIRFilteredValues[timeScale][tickWindowIndex], color='teal', alpha=0.1); #plot simpleMovingAverage
-            axs[8,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='FIR');
-            axs[8,timeScale].set_ylim([np.nanmin(variantData[var].FIRFilteredValues) - np.std([np.nanmin(variantData[var].FIRFilteredValues), np.nanmax(variantData[var].FIRFilteredValues)]) *.5, np.nanmax(variantData[var].FIRFilteredValues) + np.std([np.nanmin(variantData[var].FIRFilteredValues), np.nanmax(variantData[var].FIRFilteredValues)]) * .5]);
+            axs[9,timeScale].plot(variantData[var].FIRFilteredValues[timeScale][tickWindowIndex], color='teal', alpha=0.1); #plot simpleMovingAverage
+            axs[9,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='FIR');
+            axs[9,timeScale].set_ylim([np.nanmin(variantData[var].FIRFilteredValues) - np.std([np.nanmin(variantData[var].FIRFilteredValues), np.nanmax(variantData[var].FIRFilteredValues)]) *.5, np.nanmax(variantData[var].FIRFilteredValues) + np.std([np.nanmin(variantData[var].FIRFilteredValues), np.nanmax(variantData[var].FIRFilteredValues)]) * .5]);
 
     t1 = time.time();
     print(str(t1-t0));
