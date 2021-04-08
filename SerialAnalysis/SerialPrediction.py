@@ -35,7 +35,11 @@ warnings.filterwarnings('ignore') # ComplexWarning: Casting complex values to re
 # Predict futures based on serial input.
 # TODO/WARNINGS:
 # **Warning - Double check nyquist.
-# **Refactor for Performance?
+# **Warning - Freq analyses done rn without removing nyquist?
+# * Predict future moving averages only up to the length of original moving averages (solves weird polynomials).
+# * Polynomial predictions (peak/supp?) not working all the time... Maybe need more than 1 peak/supp. - ERROR: Improper input: N=5 must not exceed M=4
+# * Predict Independent inverse FFT... Fix: Eliminate 1st freq!!!! - ERROR: Optimal parameters not found: Number of calls to function has reached maxfev = 1000.
+# **Refactor for Performance/Modularity: simplify data types (e.g., complex_), modularize/functions, 
 
 ########################################################
 ## Quick Options
@@ -66,7 +70,7 @@ print('Initializing');
 ## Classes
 ########################################################
 class VariantData(): #variant data
-    def __init__(self, name, rawCurrency, timeScales, tickWindows, fs, nyq, dt, debugoNoiseValues, rawValues, linRegressValues, linRegressStats, linRegressSD, movingAverageValues, movingSDValues, staticPeaks, staticSupports, staticPeaksCollapsed, staticSupportsCollapsed, staticPeaksCollapsedInterp, staticSupportsCollapsedInterp, staticPeakIndeces, staticSupportIndeces, linRegressPeaksStats, linRegressPeaks, linRegressPeaksSD, linRegressSupportsStats, linRegressSupports, linRegressSupportsSD, linRegressMovingPeaks, linRegressMovingSupports, movingPeaks, movingPeaksSD, movingSupports, movingSupportsSD, fHat, fPSD, fDist, fFilterLevel, fPSDFilteredHat, fInverseValues, FIRFilteredValues, fHilb, fAmpEnv, fInstPhase, fInstFreq):
+    def __init__(self, name, rawCurrency, timeScales, tickWindows, fs, nyq, dt, debugoNoiseValues, rawValues, linRegressValues, linRegressStats, linRegressSD, movingAverageValues, movingSDValues, staticPeaks, staticSupports, staticPeaksCollapsed, staticSupportsCollapsed, staticPeaksCollapsedInterp, staticSupportsCollapsedInterp, staticPeakIndeces, staticSupportIndeces, linRegressPeaksStats, linRegressPeaks, linRegressPeaksSD, linRegressSupportsStats, linRegressSupports, linRegressSupportsSD, linRegressMovingPeaks, linRegressMovingSupports, movingPeaks, movingPeaksSD, movingSupports, movingSupportsSD, fHat, fPSD, fDist, fFilterLevel, fPSDFilteredHat, fBooleansOfInterest, fNumFreqsOfInterest, fFreqsOfInterest, fInverseValues, fIndepInverseValues, FIRFilteredValues, fHilb, fAmpEnv, fInstPhase, fInstFreq):
         self.name = name; #name/identifier - e.g., BTC
         self.rawCurrency = rawCurrency; #native currency type - e.g., USD
         self.timeScales = timeScales; #time scale - e.g., 5 min per tick
@@ -106,7 +110,11 @@ class VariantData(): #variant data
         self.fDist = fDist;
         self.fFilterLevel = fFilterLevel;
         self.fPSDFilteredHat = fPSDFilteredHat;
+        self.fBooleansOfInterest = fBooleansOfInterest;
+        self.fNumFreqsOfInterest = fNumFreqsOfInterest;
+        self.fFreqsOfInterest = fFreqsOfInterest;
         self.fInverseValues = fInverseValues;
+        self.fIndepInverseValues = fIndepInverseValues;
         self.FIRFilteredValues = FIRFilteredValues;
         self.fHilb = fHilb;
         self.fAmpEnv = fAmpEnv;
@@ -114,7 +122,7 @@ class VariantData(): #variant data
         self.fInstFreq = fInstFreq;
         
 class VariantPredict(): #variant predictions
-    def __init__(self, name, rawCurrency, timeScales, tickWindows, rawStaticMean, rawStaticSD, linRegressValues, linRegressStats, linRegressSD, movingAverage2DStats, movingAverage2D, movingAverage3DStats, movingAverage3D, movingAverage4DStats, movingAverage4D, movingAverage5DStats, movingAverage5D, movingSDValues, staticPeaksCollIntMean, staticPeaksCollIntSD, staticSupportsCollIntMean, staticSupportsCollIntSD, linRegressPeaksStats, linRegressPeaks, linRegressPeaksSD, linRegressSupportsStats, linRegressSupports, linRegressSupportsSD, movingPeaks2DStats, movingPeaks2D, movingSupports2DStats, movingSupports2D, movingPeaks3DStats, movingPeaks3D, movingSupports3DStats, movingSupports3D, movingPeaks4DStats, movingPeaks4D, movingSupports4DStats, movingSupports4D, movingPeaks5DStats, movingPeaks5D, movingSupports5DStats, movingSupports5D, fInverseValuesStats ,fInverseValues):
+    def __init__(self, name, rawCurrency, timeScales, tickWindows, rawStaticMean, rawStaticSD, linRegressValues, linRegressStats, linRegressSD, movingAverage2DStats, movingAverage2D, movingAverage3DStats, movingAverage3D, movingAverage4DStats, movingAverage4D, movingAverage5DStats, movingAverage5D, movingSDValues, staticPeaksCollIntMean, staticPeaksCollIntSD, staticSupportsCollIntMean, staticSupportsCollIntSD, linRegressPeaksStats, linRegressPeaks, linRegressPeaksSD, linRegressSupportsStats, linRegressSupports, linRegressSupportsSD, movingPeaks2DStats, movingPeaks2D, movingSupports2DStats, movingSupports2D, movingPeaks3DStats, movingPeaks3D, movingSupports3DStats, movingSupports3D, movingPeaks4DStats, movingPeaks4D, movingSupports4DStats, movingSupports4D, movingPeaks5DStats, movingPeaks5D, movingSupports5DStats, movingSupports5D, fInverseValuesStats, fIndepInverseValues, fInverseValues):
         self.name = name; #name/identifier - e.g., BTC
         self.rawCurrency = rawCurrency; #native currency type - e.g., USD
         self.timeScales = timeScales; #time scale - e.g., 5 min per tick
@@ -159,6 +167,7 @@ class VariantPredict(): #variant predictions
         self.movingSupports5DStats = movingSupports5DStats;
         self.movingSupports5D = movingSupports5D;
         self.fInverseValuesStats = fInverseValuesStats;
+        self.fIndepInverseValues = fIndepInverseValues;
         self.fInverseValues = fInverseValues;
 
 FIRTickWindows = np.arange(FIRTickWindowsMin, FIRTickWindowsMax, FIRTickWindowsStep, dtype='int');
@@ -275,8 +284,16 @@ for var in range(len(variant_names)):
     init_fFilterLevel[:] = np.NaN;
     init_fPSDFilteredHat = np.empty((len(variant_timeScales), variant_tickWindows[0]), dtype = 'complex_');
     init_fPSDFilteredHat[:] = np.NaN;
+    init_fBooleansOfInterest = np.zeros((len(variant_timeScales), variant_tickWindows[0]), dtype = 'int');
+    #init_fBooleansOfInterest[:] = np.NaN;
+    init_fNumFreqsOfInterest = np.empty((len(variant_timeScales)), dtype = 'int');
+    init_fNumFreqsOfInterest[:] = np.NaN;
+    init_fFreqsOfInterest = np.empty((len(variant_timeScales), variant_tickWindows[0]), dtype = 'complex_');
+    init_fFreqsOfInterest[:] = np.NaN;
     init_fInverseValues = np.empty((len(variant_timeScales), variant_tickWindows[0]), dtype = 'complex_');
     init_fInverseValues[:] = np.NaN;
+    init_fIndepInverseValues = np.empty((len(variant_timeScales), variant_tickWindows[0], variant_tickWindows[0]), dtype = 'complex_');
+    init_fIndepInverseValues[:] = np.NaN;
     init_FIRFilteredValues = np.empty((len(variant_timeScales), len(np.arange(FIRTickWindowsMin, FIRTickWindowsMax, FIRTickWindowsStep)), variant_tickWindows[0]), dtype = 'complex_');
     init_FIRFilteredValues[:] = np.NaN;
     init_fHilb = np.empty((len(variant_timeScales), variant_tickWindows[0]), dtype = 'complex_');
@@ -287,7 +304,7 @@ for var in range(len(variant_names)):
     init_fInstPhase[:] = np.NaN;
     init_fInstFreq = np.empty((len(variant_timeScales), variant_tickWindows[0]), dtype = 'complex_');
     init_fInstFreq[:] = np.NaN;
-    variantData[var] = VariantData(init_name, init_rawCurrency, init_timeScales, init_tickWindows, init_fs, init_nyq, init_dt, init_debugoNoiseValues, init_rawValues, init_linRegressValues, init_linRegressStats, init_linRegressSD, init_movingAverageValues, init_movingSDValues, init_staticPeaks, init_staticSupports, init_staticPeaksCollapsed, init_staticSupportsCollapsed, init_staticPeaksCollapsedInterp, init_staticSupportsCollapsedInterp, init_staticPeakIndeces, init_staticSupportIndeces, init_linRegressPeaksStats, init_linRegressPeaks, init_linRegressPeaksSD, init_linRegressSupportsStats, init_linRegressSupports, init_linRegressSupportsSD, init_linRegressMovingPeaks, init_linRegressMovingSupports, init_movingPeaks, init_movingPeaksSD, init_movingSupports, init_movingSupportsSD, init_fHat, init_fPSD, init_fDist, init_fFilterLevel, init_fPSDFilteredHat, init_fInverseValues, init_FIRFilteredValues, init_fHilb, init_fAmpEnv, init_fInstPhase, init_fInstFreq);
+    variantData[var] = VariantData(init_name, init_rawCurrency, init_timeScales, init_tickWindows, init_fs, init_nyq, init_dt, init_debugoNoiseValues, init_rawValues, init_linRegressValues, init_linRegressStats, init_linRegressSD, init_movingAverageValues, init_movingSDValues, init_staticPeaks, init_staticSupports, init_staticPeaksCollapsed, init_staticSupportsCollapsed, init_staticPeaksCollapsedInterp, init_staticSupportsCollapsedInterp, init_staticPeakIndeces, init_staticSupportIndeces, init_linRegressPeaksStats, init_linRegressPeaks, init_linRegressPeaksSD, init_linRegressSupportsStats, init_linRegressSupports, init_linRegressSupportsSD, init_linRegressMovingPeaks, init_linRegressMovingSupports, init_movingPeaks, init_movingPeaksSD, init_movingSupports, init_movingSupportsSD, init_fHat, init_fPSD, init_fDist, init_fFilterLevel, init_fPSDFilteredHat, init_fBooleansOfInterest, init_fNumFreqsOfInterest, init_fFreqsOfInterest, init_fInverseValues, init_fIndepInverseValues, init_FIRFilteredValues, init_fHilb, init_fAmpEnv, init_fInstPhase, init_fInstFreq);
 
 ########################################################
 ## Establish VariantPredict Structures
@@ -380,9 +397,10 @@ for var in range(len(variant_names)):
     init_movingSupports5D[:] = np.NaN;
     init_fInverseValuesStats = np.empty((len(variant_timeScales), 4));
     init_fInverseValuesStats[:] = np.NaN;
-    init_fInverseValues = np.empty((len(variant_timeScales), variant_tickWindowsPredict[0]));
-    init_fInverseValues[:] = np.NaN;
-    variantPredict[var] = VariantPredict(init_name, init_rawCurrency, init_timeScales, init_tickWindows, init_rawStaticMean, init_rawStaticSD, init_linRegressValues, init_linRegressStats, init_linRegressSD, init_movingAverage2DStats, init_movingAverage2D, init_movingAverage3DStats, init_movingAverage3D, init_movingAverage4DStats, init_movingAverage4D, init_movingAverage5DStats, init_movingAverage5D, init_movingSDValues, init_staticPeaksCollIntMean, init_staticPeaksCollIntSD, init_staticSupportsCollIntMean, init_staticSupportsCollIntSD, init_linRegressPeaksStats, init_linRegressPeaks, init_linRegressPeaksSD, init_linRegressSupportsStats, init_linRegressSupports, init_linRegressSupportsSD, init_movingPeaks2DStats, init_movingPeaks2D, init_movingSupports2DStats, init_movingSupports2D, init_movingPeaks3DStats, init_movingPeaks3D, init_movingSupports3DStats, init_movingSupports3D, init_movingPeaks4DStats, init_movingPeaks4D, init_movingSupports4DStats, init_movingSupports4D, init_movingPeaks5DStats, init_movingPeaks5D, init_movingSupports5DStats, init_movingSupports5D, init_fInverseValuesStats, init_fInverseValues);
+    init_fIndepInverseValues = np.empty((len(variant_timeScales), variant_tickWindows[0], variant_tickWindowsPredict[0]), dtype = 'complex_');
+    init_fIndepInverseValues[:] = np.NaN;
+    init_fInverseValues = np.zeros((len(variant_timeScales), variant_tickWindowsPredict[0]), dtype = 'complex_');
+    variantPredict[var] = VariantPredict(init_name, init_rawCurrency, init_timeScales, init_tickWindows, init_rawStaticMean, init_rawStaticSD, init_linRegressValues, init_linRegressStats, init_linRegressSD, init_movingAverage2DStats, init_movingAverage2D, init_movingAverage3DStats, init_movingAverage3D, init_movingAverage4DStats, init_movingAverage4D, init_movingAverage5DStats, init_movingAverage5D, init_movingSDValues, init_staticPeaksCollIntMean, init_staticPeaksCollIntSD, init_staticSupportsCollIntMean, init_staticSupportsCollIntSD, init_linRegressPeaksStats, init_linRegressPeaks, init_linRegressPeaksSD, init_linRegressSupportsStats, init_linRegressSupports, init_linRegressSupportsSD, init_movingPeaks2DStats, init_movingPeaks2D, init_movingSupports2DStats, init_movingSupports2D, init_movingPeaks3DStats, init_movingPeaks3D, init_movingSupports3DStats, init_movingSupports3D, init_movingPeaks4DStats, init_movingPeaks4D, init_movingSupports4DStats, init_movingSupports4D, init_movingPeaks5DStats, init_movingPeaks5D, init_movingSupports5DStats, init_movingSupports5D, init_fInverseValuesStats, init_fIndepInverseValues, init_fInverseValues);
 
 ########################################################
 ## Generate/Import Variant's Initial rawData
@@ -691,9 +709,9 @@ while t1Master-t0Master < t1MasterFin:
                 b = variantPredict[var].movingAverage2DStats[timeScale][tickWindowIndex][1];
                 c = variantPredict[var].movingAverage2DStats[timeScale][tickWindowIndex][2];
                 originalFitWindowSize = variant_tickWindows[0] - tickWindowSize + 1;
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage2D[timeScale][tickWindowIndex][value] = a * value**2 + b * value + (a * originalFitWindowSize**2 + b * originalFitWindowSize + c);
-        
+
         # 3rd Degree Polynomial CURVE_FIT (3D)
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -704,9 +722,9 @@ while t1Master-t0Master < t1MasterFin:
                 c = variantPredict[var].movingAverage3DStats[timeScale][tickWindowIndex][2];
                 d = variantPredict[var].movingAverage3DStats[timeScale][tickWindowIndex][3];
                 originalFitWindowSize = variant_tickWindows[0] - tickWindowSize + 1;
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage3D[timeScale][tickWindowIndex][value] = a * value**3 + b * value**2 + c * value + (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d);
-        
+
         # 4th Degree Polynomial CURVE_FIT (4D)
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -718,9 +736,9 @@ while t1Master-t0Master < t1MasterFin:
                 d = variantPredict[var].movingAverage4DStats[timeScale][tickWindowIndex][3];
                 e = variantPredict[var].movingAverage4DStats[timeScale][tickWindowIndex][4];
                 originalFitWindowSize = variant_tickWindows[0] - tickWindowSize + 1;
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage4D[timeScale][tickWindowIndex][value] = a * value**4 + b * value**3 + c * value**2 + d * value + (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e);
-        
+
         # 5th Degree Polynomial CURVE_FIT (5D)
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -733,14 +751,14 @@ while t1Master-t0Master < t1MasterFin:
                 e = variantPredict[var].movingAverage5DStats[timeScale][tickWindowIndex][4];
                 f = variantPredict[var].movingAverage5DStats[timeScale][tickWindowIndex][5];
                 originalFitWindowSize = variant_tickWindows[0] - tickWindowSize + 1;
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage5D[timeScale][tickWindowIndex][value] = a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value + (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f);
-        
+
         # Plot 2nd Degree Polynomial CURVE_FIT (2D)
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage2D[timeScale][tickWindowIndex], linewidth=1, color='darkviolet', alpha=0.6); #plot simpleMovingAverage
-        
+                
         # Plot 3rd Degree Polynomial CURVE_FIT (3D)
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -813,11 +831,15 @@ while t1Master-t0Master < t1MasterFin:
         
         # Interpolated Collapsed Peaks and Supports Mean +/- SD
         for timeScale in range(len(variant_timeScales)):
-             variantPredict[var].staticPeaksCollIntMean[timeScale] = np.nanmean(variantData[var].staticPeaksCollapsedInterp[timeScale]);
-             variantPredict[var].staticPeaksCollIntSD[timeScale] = np.nanstd(variantData[var].staticPeaksCollapsedInterp[timeScale]);
-             variantPredict[var].staticSupportsCollIntMean[timeScale] = np.nanmean(variantData[var].staticSupportsCollapsedInterp[timeScale]);
-             variantPredict[var].staticSupportsCollIntSD[timeScale] = np.nanstd(variantData[var].staticSupportsCollapsedInterp[timeScale]);
-        
+            tempPeakIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticPeaksCollapsedInterp[timeScale])) if x];
+            tempSupportIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticSupportsCollapsedInterp[timeScale])) if x];
+            if tempPeakIndeces:
+                variantPredict[var].staticPeaksCollIntMean[timeScale][:-tempPeakIndeces[0]] = np.nanmean(variantData[var].staticPeaksCollapsedInterp[timeScale]);
+                variantPredict[var].staticPeaksCollIntSD[timeScale][:-tempPeakIndeces[0]] = np.nanstd(variantData[var].staticPeaksCollapsedInterp[timeScale]);
+            if tempSupportIndeces:
+                variantPredict[var].staticSupportsCollIntMean[timeScale][:-tempSupportIndeces[0]] = np.nanmean(variantData[var].staticSupportsCollapsedInterp[timeScale]);
+                variantPredict[var].staticSupportsCollIntSD[timeScale][:-tempSupportIndeces[0]] = np.nanstd(variantData[var].staticSupportsCollapsedInterp[timeScale]);
+
         # Plot Interpolated Collapsed Peaks and Supports Mean +/- SD
         for timeScale in range(len(variant_timeScales)):  
             axs[3,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].staticPeaksCollIntMean[timeScale], '-', linewidth=1, markersize=1, color='violet', alpha=0.8); #plot simpleMovingAverage + SD
@@ -849,8 +871,10 @@ while t1Master-t0Master < t1MasterFin:
                 if len(preSupportIndeces) > 1:
                     for value in range(len(preSupportIndeces)):
                         variantData[var].staticSupportIndeces[timeScale][tickWindowIndex][value] = preSupportIndeces[value];
-                realPeakIndeces = variantData[var].staticPeakIndeces[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticPeakIndeces[timeScale][tickWindowIndex])];
-                realSupportIndeces = variantData[var].staticSupportIndeces[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticSupportIndeces[timeScale][tickWindowIndex])];
+                if len(prePeakIndeces) > 1:
+                    realPeakIndeces = variantData[var].staticPeakIndeces[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticPeakIndeces[timeScale][tickWindowIndex])];
+                if len(preSupportIndeces) > 1:
+                    realSupportIndeces = variantData[var].staticSupportIndeces[timeScale][tickWindowIndex][~np.isnan(variantData[var].staticSupportIndeces[timeScale][tickWindowIndex])];
                 # r and SD assignment, interpolate in-betweens manually
                 if len(realPeakIndeces) > 1:
                     lenPeakIndeces = realPeakIndeces[len(realPeakIndeces)-1]-realPeakIndeces[0];
@@ -892,12 +916,17 @@ while t1Master-t0Master < t1MasterFin:
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 tickWindowSize = FIRTickWindows[tickWindowIndex];
-                for value in range(0,variant_tickWindowsPredict[0]):
-                    variantPredict[var].linRegressPeaks[timeScale][tickWindowIndex][value] = variantData[var].linRegressPeaks[timeScale][tickWindowIndex][-1] + variantData[var].linRegressPeaksStats[timeScale][tickWindowIndex][0] * value;
-                    variantPredict[var].linRegressSupports[timeScale][tickWindowIndex][value] = variantData[var].linRegressSupports[timeScale][tickWindowIndex][-1] + variantData[var].linRegressSupportsStats[timeScale][tickWindowIndex][0] * value;
-                variantPredict[var].linRegressPeaksSD[timeScale][tickWindowIndex] = variantData[var].linRegressPeaksSD[timeScale][tickWindowIndex][-variant_tickWindowsPredict[0]:];
-                variantPredict[var].linRegressSupportsSD[timeScale][tickWindowIndex] = variantData[var].linRegressSupportsSD[timeScale][tickWindowIndex][-variant_tickWindowsPredict[0]:];
-        
+                tempPeakIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticPeaksCollapsedInterp[timeScale])) if x];
+                tempSupportIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticSupportsCollapsedInterp[timeScale])) if x];
+                if tempPeakIndeces:
+                    for value in range(0,variant_tickWindowsPredict[0]-tempPeakIndeces[0]):
+                        variantPredict[var].linRegressPeaks[timeScale][tickWindowIndex][value] = variantData[var].linRegressPeaks[timeScale][tickWindowIndex][-1] + variantData[var].linRegressPeaksStats[timeScale][tickWindowIndex][0] * value;
+                    variantPredict[var].linRegressPeaksSD[timeScale][tickWindowIndex][:-tempPeakIndeces[0]] = variantData[var].linRegressPeaksSD[timeScale][tickWindowIndex][-variant_tickWindowsPredict[0]:-tempPeakIndeces[0]];
+                if tempSupportIndeces:
+                    for value in range(0,variant_tickWindowsPredict[0]-tempSupportIndeces[0]):
+                        variantPredict[var].linRegressSupports[timeScale][tickWindowIndex][value] = variantData[var].linRegressSupports[timeScale][tickWindowIndex][-1] + variantData[var].linRegressSupportsStats[timeScale][tickWindowIndex][0] * value;
+                    variantPredict[var].linRegressSupportsSD[timeScale][tickWindowIndex][:-tempSupportIndeces[0]] = variantData[var].linRegressSupportsSD[timeScale][tickWindowIndex][-variant_tickWindowsPredict[0]:-tempSupportIndeces[0]];
+                    
         # Plot predicted r +/- SD for Peaks and Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -957,7 +986,7 @@ while t1Master-t0Master < t1MasterFin:
                 b = variantPredict[var].movingPeaks2DStats[timeScale][tickWindowIndex][1];
                 c = variantPredict[var].movingPeaks2DStats[timeScale][tickWindowIndex][2];
                 originalFitWindowSize = len(variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks2D[timeScale][tickWindowIndex][value] = a * value**2 + b * value + (a * originalFitWindowSize**2 + b * originalFitWindowSize + c);
 
         # 3rd Degree Polynomial CURVE_FIT (3D) for Peaks
@@ -970,9 +999,9 @@ while t1Master-t0Master < t1MasterFin:
                 c = variantPredict[var].movingPeaks3DStats[timeScale][tickWindowIndex][2];
                 d = variantPredict[var].movingPeaks3DStats[timeScale][tickWindowIndex][3];
                 originalFitWindowSize = len(variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks3D[timeScale][tickWindowIndex][value] = a * value**3 + b * value**2 + c * value + (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d);
-        
+
         # 4th Degree Polynomial CURVE_FIT (4D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -984,9 +1013,9 @@ while t1Master-t0Master < t1MasterFin:
                 d = variantPredict[var].movingPeaks4DStats[timeScale][tickWindowIndex][3];
                 e = variantPredict[var].movingPeaks4DStats[timeScale][tickWindowIndex][4];
                 originalFitWindowSize = len(variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks4D[timeScale][tickWindowIndex][value] = a * value**4 + b * value**3 + c * value**2 + d * value + (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e);
-        
+
         # 5th Degree Polynomial CURVE_FIT (5D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -999,7 +1028,7 @@ while t1Master-t0Master < t1MasterFin:
                 e = variantPredict[var].movingPeaks5DStats[timeScale][tickWindowIndex][4];
                 f = variantPredict[var].movingPeaks5DStats[timeScale][tickWindowIndex][5];
                 originalFitWindowSize = len(variantData[var].movingPeaks[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingPeaks[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks5D[timeScale][tickWindowIndex][value] = a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value + (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f);
 
         # 2nd Degree Polynomial CURVE_FIT (2D) for Supports
@@ -1011,7 +1040,7 @@ while t1Master-t0Master < t1MasterFin:
                 b = variantPredict[var].movingSupports2DStats[timeScale][tickWindowIndex][1];
                 c = variantPredict[var].movingSupports2DStats[timeScale][tickWindowIndex][2];
                 originalFitWindowSize = len(variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports2D[timeScale][tickWindowIndex][value] = a * value**2 + b * value + (a * originalFitWindowSize**2 + b * originalFitWindowSize + c);
 
         # 3rd Degree Polynomial CURVE_FIT (3D) for Supports
@@ -1024,7 +1053,7 @@ while t1Master-t0Master < t1MasterFin:
                 c = variantPredict[var].movingSupports3DStats[timeScale][tickWindowIndex][2];
                 d = variantPredict[var].movingSupports3DStats[timeScale][tickWindowIndex][3];
                 originalFitWindowSize = len(variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports3D[timeScale][tickWindowIndex][value] = a * value**3 + b * value**2 + c * value + (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d);
         
         # 4th Degree Polynomial CURVE_FIT (4D) for Supports
@@ -1038,7 +1067,7 @@ while t1Master-t0Master < t1MasterFin:
                 d = variantPredict[var].movingSupports4DStats[timeScale][tickWindowIndex][3];
                 e = variantPredict[var].movingSupports4DStats[timeScale][tickWindowIndex][4];
                 originalFitWindowSize = len(variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports4D[timeScale][tickWindowIndex][value] = a * value**4 + b * value**3 + c * value**2 + d * value + (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e);
         
         # 5th Degree Polynomial CURVE_FIT (5D) for Supports
@@ -1053,7 +1082,7 @@ while t1Master-t0Master < t1MasterFin:
                 e = variantPredict[var].movingSupports5DStats[timeScale][tickWindowIndex][4];
                 f = variantPredict[var].movingSupports5DStats[timeScale][tickWindowIndex][5];
                 originalFitWindowSize = len(variantData[var].movingSupports[timeScale][tickWindowIndex][~np.isnan(variantData[var].movingSupports[timeScale][tickWindowIndex])]);
-                for value in range(0,variant_tickWindowsPredict[0]):
+                for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports5D[timeScale][tickWindowIndex][value] = a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value + (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f);
 
         # Plot 2nd Degree Polynomial CURVE_FIT (2D) for Peaks
@@ -1149,22 +1178,35 @@ while t1Master-t0Master < t1MasterFin:
         print('Output PSD Filter and Inverse FFT');
         # Filter out noise with PSD Filter then Inverse FFT the Filtered Values
         for timeScale in range(len(variant_timeScales)):
-            variantData[var].fPSDFilteredHat[timeScale] = (variantData[var].fPSD[timeScale] > variantData[var].fFilterLevel[timeScale]) * variantData[var].fHat[timeScale];
+            # Collapsed Waves IFFT
+            variantData[var].fBooleansOfInterest[timeScale] = (variantData[var].fPSD[timeScale] > variantData[var].fFilterLevel[timeScale]);
+            variantData[var].fPSDFilteredHat[timeScale] = variantData[var].fBooleansOfInterest[timeScale] * variantData[var].fHat[timeScale];
             variantData[var].fInverseValues[timeScale] = np.fft.ifft(variantData[var].fPSDFilteredHat[timeScale]);
-            
-        # Do fInverseValues separately for each frequency of interest (this independence important for creating predictive sin functions);
-        # plt.plot(variantData[var].fDist[timeScale][1:], variantData[var].fPSD[timeScale][1:], color='teal', alpha=0.6);
-        # variantData[var].fDist[timeScale][1:]
-        #for timeScale in range(len(variant_timeScales)):
-            #variantData[var].fPSDFilteredHat[timeScale] = variantData[var].fDist[timeScale][variantData[var].fPSD[timeScale] > variantData[var].fFilterLevel[timeScale]];
-            
+            # Independent Waves IFFT
+            variantData[var].fFreqsOfInterest[timeScale] = variantData[var].fDist[timeScale][variantData[var].fBooleansOfInterest[timeScale]];
+            variantData[var].fNumFreqsOfInterest[timeScale] = len(variantData[var].fFreqsOfInterest[timeScale]);
+            indecesOfInterest = [i for i, x in enumerate(variantData[var].fBooleansOfInterest[timeScale]) if x];
+            if indecesOfInterest:
+                for freq in indecesOfInterest:
+                    focusedPSDFilteredHat = np.zeros((variant_tickWindows[0]), dtype = 'complex_');
+                    focusedPSDFilteredHat[freq] = variantData[var].fPSDFilteredHat[timeScale][freq];
+                    variantData[var].fIndepInverseValues[timeScale][freq] = np.fft.ifft(focusedPSDFilteredHat);
+        
         # Plot Debug Oscillation Noise Only
         for timeScale in range(len(variant_timeScales)):
             axs[7,timeScale].plot(variantData[var].debugoNoiseValues[timeScale], color='deepskyblue', alpha=0.8);
             axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
             axs[7,timeScale].set_ylim([np.min(variantData[var].debugoNoiseValues) - np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) *.5, np.max(variantData[var].debugoNoiseValues) + np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) * .5]);
+        # Plot Independent Waves
+        for timeScale in range(len(variant_timeScales)):
+            indecesOfInterest = [i for i, x in enumerate(variantData[var].fBooleansOfInterest[timeScale]) if x];
+            if indecesOfInterest:
+                for freq in indecesOfInterest:
+                    axs[7,timeScale].plot(variantData[var].fIndepInverseValues[timeScale][freq], color='steelblue', alpha=0.8);
+                    #axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
+                    #axs[7,timeScale].set_ylim([np.nanmin(variantData[var].fIndepInverseValues) - np.nanstd([np.nanmin(variantData[var].fIndepInverseValues), np.nanmax(variantData[var].fIndepInverseValues)]) *.5, np.nanmax(variantData[var].fIndepInverseValues) + np.std([np.nanmin(variantData[var].fIndepInverseValues), np.nanmax(variantData[var].fIndepInverseValues)]) * .5]);
         
-        # Plot Inverse Values
+        # Plot Collapsed Inverse Values
         for timeScale in range(len(variant_timeScales)):
             axs[8,timeScale].plot(variantData[var].fInverseValues[timeScale], color='teal', alpha=0.8);
             axs[8,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='ifft');
@@ -1179,30 +1221,46 @@ while t1Master-t0Master < t1MasterFin:
         ########################################################
         t0 = time.time();
         print('Predict Inverse FFT');
-        # For each frequency of interest, curve_fit a sinusoidal function for it
+        # Curve-fit Independent Frequencies of Interest
+        for timeScale in range(len(variant_timeScales)):
+            indecesOfInterest = [i for i, x in enumerate(variantData[var].fBooleansOfInterest[timeScale]) if x];
+            if indecesOfInterest:
+                for freq in indecesOfInterest:
+                    variantPredict[var].fInverseValuesStats[timeScale], _ = sp.optimize.curve_fit(objectiveSin, np.arange(len(variantData[var].fInverseValues[timeScale])), variantData[var].fInverseValues[timeScale]);
+                    a = variantPredict[var].fInverseValuesStats[timeScale][0];
+                    b = variantPredict[var].fInverseValuesStats[timeScale][1];
+                    c = variantPredict[var].fInverseValuesStats[timeScale][2];
+                    d = variantPredict[var].fInverseValuesStats[timeScale][3];
+                    originalFitWindowSize = variant_tickWindows[0];
+                    for value in range(0,variant_tickWindowsPredict[0]):
+                        variantPredict[var].fIndepInverseValues[timeScale][freq][value] = a * np.sin(b * value + c) + (a * np.sin(b * originalFitWindowSize + c) + d); # a * np.sin(b * x + c) + d
         
-        # Try out multiple phases for each sin function such that their conjunction matches original ifft OR rawData*
+        # Add Independent Frequency Predictions Together then Mean them to form Collapsed/Full Inverse FFT Prediction
+        variantPredict[var].fInverseValues = np.zeros((len(variant_timeScales), variant_tickWindowsPredict[0]), dtype = 'complex_');
+        freqsOfInterestCounter = np.zeros((len(variant_timeScales)));
+        for timeScale in range(len(variant_timeScales)):
+            indecesOfInterest = [i for i, x in enumerate(variantData[var].fBooleansOfInterest[timeScale]) if x];
+            if indecesOfInterest:
+                for freq in indecesOfInterest:
+                    freqsOfInterestCounter[timeScale] += 1;
+                    variantPredict[var].fInverseValues[timeScale] += variantPredict[var].fIndepInverseValues[timeScale][freq];
+            variantPredict[var].fInverseValues[timeScale] = variantPredict[var].fInverseValues[timeScale] / freqsOfInterestCounter[timeScale];
         
-        # OR create ifft of each individual frequency of interest, curve-fit them, then add together to predict
+        # Plot Predicted Independent Waves
+        for timeScale in range(len(variant_timeScales)):
+            indecesOfInterest = [i for i, x in enumerate(variantData[var].fBooleansOfInterest[timeScale]) if x];
+            if indecesOfInterest:
+                for freq in indecesOfInterest:
+                    axs[7,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantData[var].fIndepInverseValues[timeScale][freq], color='violet', alpha=0.6);
         
-        # for timeScale in range(len(variant_timeScales)):
-        #     variantPredict[var].fInverseValuesStats[timeScale], _ = sp.optimize.curve_fit(objectiveSin, np.arange(len(variantData[var].fInverseValues[timeScale])), variantData[var].fInverseValues[timeScale]);
-        #     a = variantPredict[var].fInverseValuesStats[timeScale][0];
-        #     b = variantPredict[var].fInverseValuesStats[timeScale][1];
-        #     c = variantPredict[var].fInverseValuesStats[timeScale][2];
-        #     d = variantPredict[var].fInverseValuesStats[timeScale][3];
-        #     originalFitWindowSize = variant_tickWindows[0];
-        #     for value in range(0,variant_tickWindowsPredict[0]):
-        #         variantPredict[var].fInverseValues[timeScale][tickWindowIndex][value] = a * np.sin(b * value + c) + (a * np.sin(b * originalFitWindowSize + c) + d); # a * np.sin(b * x + c) + d
-
         # Plot Predicted Inverse FFT
-        #for timeScale in range(len(variant_timeScales)):
-            
+        for timeScale in range(len(variant_timeScales)):
+            axs[8,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantData[var].fInverseValues[timeScale], color='violet', alpha=0.6);
         
         t1 = time.time();
         if debugTimers == 1:
             print(str(t1-t0));
-    
+            
         ########################################################
         ## Finite & Infinite Impulse Response Filters (FIR & IIR)
         ########################################################
@@ -1225,18 +1283,18 @@ while t1Master-t0Master < t1MasterFin:
                 # FIR filter only the frequencies below 1 nyquist
                 FIRFilterPoints = sp.signal.firls(tickWindowSize, variantData[var].fDist[timeScale][(variantData[var].fDist[timeScale]/nyq) < 1], fOfInterest[(variantData[var].fDist[timeScale]/nyq) < 1], fs=fs);
                 variantData[var].FIRFilteredValues[timeScale][tickWindowIndex] = sp.signal.lfilter(FIRFilterPoints, 1.0, variantData[var].rawValues[timeScale]);
-    
+        
         # Plot FIR Filtered rawValues
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[9,timeScale].plot(variantData[var].FIRFilteredValues[timeScale][tickWindowIndex], color='teal', alpha=0.6); #plot simpleMovingAverage
                 axs[9,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='FIR');
                 axs[9,timeScale].set_ylim([np.nanmin(variantData[var].FIRFilteredValues) - np.std([np.nanmin(variantData[var].FIRFilteredValues), np.nanmax(variantData[var].FIRFilteredValues)]) *.5, np.nanmax(variantData[var].FIRFilteredValues) + np.std([np.nanmin(variantData[var].FIRFilteredValues), np.nanmax(variantData[var].FIRFilteredValues)]) * .5]);
-    
+        
         t1 = time.time();
         if debugTimers == 1:
             print(str(t1-t0));
-    
+        
         ########################################################
         ## Output Hilbert Transform (HILB)
         ########################################################
@@ -1255,11 +1313,11 @@ while t1Master-t0Master < t1MasterFin:
         for timeScale in range(len(variant_timeScales)):
             fs = 1/(variant_timeScales[timeScale] * 60); #frequency of sample (in Hz)
             variantData[var].fInstFreq[timeScale][1:] = np.diff(variantData[var].fInstPhase[timeScale]) / (2.0 * np.pi) * fs;
-    
+        
         t1 = time.time();
         if debugTimers == 1:
             print(str(t1-t0));
-            
+        
         ########################################################
         ## Variant Plot
         ########################################################
