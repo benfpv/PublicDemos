@@ -40,6 +40,8 @@ warnings.filterwarnings('ignore') # ComplexWarning: Casting complex values to re
 # * Polynomial predictions (peak/supp?) not working all the time... Maybe need more than 1 peak/supp. - ERROR: Improper input: N=5 must not exceed M=4
 # * Predict Independent inverse FFT... Fix: Eliminate 1st freq!!!! - ERROR: Optimal parameters not found: Number of calls to function has reached maxfev = 1000.
 # **Refactor for Performance/Modularity: simplify data types (e.g., complex_), modularize/functions, 
+# * Todo: Check FIR->Hilb
+# * Todo: Vary the fftL filtering limit to create predictions which vary by filtering limit.
 
 ########################################################
 ## Quick Options
@@ -122,7 +124,7 @@ class VariantData(): #variant data
         self.fInstFreq = fInstFreq;
         
 class VariantPredict(): #variant predictions
-    def __init__(self, name, rawCurrency, timeScales, tickWindows, rawStaticMean, rawStaticSD, linRegressStats, linRegressValues, linRegressSD, linRegressValuesInverted, movingAverage2DStats, movingAverage2D, movingAverage2DInverted, movingAverage3DStats, movingAverage3D, movingAverage3DInverted, movingAverage4DStats, movingAverage4D, movingAverage4DInverted, movingAverage5DStats, movingAverage5D, movingAverage5DInverted, movingSDValues, staticPeaksCollIntMean, staticPeaksCollIntSD, staticSupportsCollIntMean, staticSupportsCollIntSD, linRegressPeaksStats, linRegressPeaks, linRegressPeaksInverted, linRegressPeaksSD, linRegressSupportsStats, linRegressSupports, linRegressSupportsInverted, linRegressSupportsSD, movingPeaks2DStats, movingPeaks2D, movingPeaks2DInverted, movingSupports2DStats, movingSupports2D, movingSupports2DInverted, movingPeaks3DStats, movingPeaks3D, movingPeaks3DInverted, movingSupports3DStats, movingSupports3D, movingSupports3DInverted, movingPeaks4DStats, movingPeaks4D, movingPeaks4DInverted, movingSupports4DStats, movingSupports4D, movingSupports4DInverted, movingPeaks5DStats, movingPeaks5D, movingPeaks5DInverted, movingSupports5DStats, movingSupports5D, movingSupports5DInverted, fInverseValuesStats, fIndepInverseValues, fIndepInverseValuesReversed, fInverseValues, fInverseValuesReversed, fFIRFilteredValues, fFIRFilteredValuesReversed):
+    def __init__(self, name, rawCurrency, timeScales, tickWindows, rawStaticMean, rawStaticSD, linRegressStats, linRegressValues, linRegressSD, linRegressValuesInverted, movingAverage2DStats, movingAverage2D, movingAverage2DInverted, movingAverage3DStats, movingAverage3D, movingAverage3DInverted, movingAverage4DStats, movingAverage4D, movingAverage4DInverted, movingAverage5DStats, movingAverage5D, movingAverage5DInverted, movingSDValues, staticPeaksCollIntMean, staticPeaksCollIntSD, staticSupportsCollIntMean, staticSupportsCollIntSD, linRegressPeaksStats, linRegressPeaks, linRegressPeaksInverted, linRegressPeaksSD, linRegressSupportsStats, linRegressSupports, linRegressSupportsInverted, linRegressSupportsSD, movingPeaks2DStats, movingPeaks2D, movingPeaks2DInverted, movingSupports2DStats, movingSupports2D, movingSupports2DInverted, movingPeaks3DStats, movingPeaks3D, movingPeaks3DInverted, movingSupports3DStats, movingSupports3D, movingSupports3DInverted, movingPeaks4DStats, movingPeaks4D, movingPeaks4DInverted, movingSupports4DStats, movingSupports4D, movingSupports4DInverted, movingPeaks5DStats, movingPeaks5D, movingPeaks5DInverted, movingSupports5DStats, movingSupports5D, movingSupports5DInverted, fInverseValuesStats, fIndepInverseValues, fIndepInverseValuesReversed, fInverseValues, fInverseValuesReversed, fFIRFilteredValues, fFIRFilteredValuesReversed, fInstPhase):
         self.name = name; #name/identifier - e.g., BTC
         self.rawCurrency = rawCurrency; #native currency type - e.g., USD
         self.timeScales = timeScales; #time scale - e.g., 5 min per tick
@@ -188,6 +190,7 @@ class VariantPredict(): #variant predictions
         self.fInverseValuesReversed = fInverseValuesReversed;
         self.fFIRFilteredValues = fFIRFilteredValues;
         self.fFIRFilteredValuesReversed = fFIRFilteredValuesReversed;
+        self.fInstPhase = fInstPhase;
 
 FIRTickWindows = np.arange(FIRTickWindowsMin, FIRTickWindowsMax, FIRTickWindowsStep, dtype='int');
 
@@ -456,7 +459,9 @@ for var in range(len(variant_names)):
     init_fFIRFilteredValues[:] = np.NaN;
     init_fFIRFilteredValuesReversed = np.empty((len(variant_timeScales), len(np.arange(FIRTickWindowsMin, FIRTickWindowsMax, FIRTickWindowsStep)), variant_tickWindowsPredict[0]), dtype = 'complex_');
     init_fFIRFilteredValuesReversed[:] = np.NaN;
-    variantPredict[var] = VariantPredict(init_name, init_rawCurrency, init_timeScales, init_tickWindows, init_rawStaticMean, init_rawStaticSD, init_linRegressStats, init_linRegressValues, init_linRegressSD, init_linRegressValuesInverted, init_movingAverage2DStats, init_movingAverage2D, init_movingAverage2DInverted, init_movingAverage3DStats, init_movingAverage3D, init_movingAverage3DInverted, init_movingAverage4DStats, init_movingAverage4D, init_movingAverage4DInverted, init_movingAverage5DStats, init_movingAverage5D, init_movingAverage5DInverted, init_movingSDValues, init_staticPeaksCollIntMean, init_staticPeaksCollIntSD, init_staticSupportsCollIntMean, init_staticSupportsCollIntSD, init_linRegressPeaksStats, init_linRegressPeaks, init_linRegressPeaksInverted, init_linRegressPeaksSD, init_linRegressSupportsStats, init_linRegressSupports, init_linRegressSupportsInverted, init_linRegressSupportsSD, init_movingPeaks2DStats, init_movingPeaks2D, init_movingPeaks2DInverted, init_movingSupports2DStats, init_movingSupports2D, init_movingSupports2DInverted, init_movingPeaks3DStats, init_movingPeaks3D, init_movingPeaks3DInverted, init_movingSupports3DStats, init_movingSupports3D, init_movingSupports3DInverted, init_movingPeaks4DStats, init_movingPeaks4D, init_movingPeaks4DInverted, init_movingSupports4DStats, init_movingSupports4D, init_movingSupports4DInverted, init_movingPeaks5DStats, init_movingPeaks5D, init_movingPeaks5DInverted, init_movingSupports5DStats, init_movingSupports5D, init_movingSupports5DInverted, init_fInverseValuesStats, init_fIndepInverseValues, init_fIndepInverseValuesReversed, init_fInverseValues, init_fInverseValuesReversed, init_fFIRFilteredValues, init_fFIRFilteredValuesReversed);
+    init_fInstPhase = np.empty((len(variant_timeScales), variant_tickWindows[0], variant_tickWindowsPredict[0]), dtype = 'complex_');
+    init_fInstPhase[:] = np.NaN;
+    variantPredict[var] = VariantPredict(init_name, init_rawCurrency, init_timeScales, init_tickWindows, init_rawStaticMean, init_rawStaticSD, init_linRegressStats, init_linRegressValues, init_linRegressSD, init_linRegressValuesInverted, init_movingAverage2DStats, init_movingAverage2D, init_movingAverage2DInverted, init_movingAverage3DStats, init_movingAverage3D, init_movingAverage3DInverted, init_movingAverage4DStats, init_movingAverage4D, init_movingAverage4DInverted, init_movingAverage5DStats, init_movingAverage5D, init_movingAverage5DInverted, init_movingSDValues, init_staticPeaksCollIntMean, init_staticPeaksCollIntSD, init_staticSupportsCollIntMean, init_staticSupportsCollIntSD, init_linRegressPeaksStats, init_linRegressPeaks, init_linRegressPeaksInverted, init_linRegressPeaksSD, init_linRegressSupportsStats, init_linRegressSupports, init_linRegressSupportsInverted, init_linRegressSupportsSD, init_movingPeaks2DStats, init_movingPeaks2D, init_movingPeaks2DInverted, init_movingSupports2DStats, init_movingSupports2D, init_movingSupports2DInverted, init_movingPeaks3DStats, init_movingPeaks3D, init_movingPeaks3DInverted, init_movingSupports3DStats, init_movingSupports3D, init_movingSupports3DInverted, init_movingPeaks4DStats, init_movingPeaks4D, init_movingPeaks4DInverted, init_movingSupports4DStats, init_movingSupports4D, init_movingSupports4DInverted, init_movingPeaks5DStats, init_movingPeaks5D, init_movingPeaks5DInverted, init_movingSupports5DStats, init_movingSupports5D, init_movingSupports5DInverted, init_fInverseValuesStats, init_fIndepInverseValues, init_fIndepInverseValuesReversed, init_fInverseValues, init_fInverseValuesReversed, init_fFIRFilteredValues, init_fFIRFilteredValuesReversed, init_fInstPhase);
 
 ########################################################
 ## Generate/Import Variant's Initial rawData
@@ -475,7 +480,6 @@ oNoiseMultipliers = np.empty((len(variant_names), oNoiseNumMultipliers));
 oNoiseMultipliers[:] = np.NaN;
 oNoiseAmpMultipliers = np.empty((len(variant_names), oNoiseNumMultipliers));
 oNoiseAmpMultipliers[:] = np.NaN;
-
 for var in range(len(variant_names)):
     print('=============== GENERATE/IMPORT INITIAL VARIANT DATA ===============');
     # Generate Random VariantData of Max Length at Min (Best) Resolution
@@ -664,11 +668,11 @@ while t1Master-t0Master < t1MasterFin:
         t1 = time.time();
         if debugTimers == 1:
             print(str(t1-t0));
-            
+        
         ########################################################
         ## Predict Raw
         ########################################################
-        print('Predict Raw');
+        print('Predict Raw (Mean +/- SD)');
         t0 = time.time();
         # Get rawStaticMean & rawStaticSD
         for timeScale in range(len(variant_timeScales)):
@@ -767,7 +771,6 @@ while t1Master-t0Master < t1MasterFin:
         ########################################################
         t0 = time.time();
         print('Predict Moving Average +/- SD (Bollinger Bands)');
-        
         # 2nd Degree Polynomial CURVE_FIT (2D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -780,7 +783,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage2D[timeScale][tickWindowIndex][value] = a * value**2 + b * value + (a * originalFitWindowSize**2 + b * originalFitWindowSize + c);
                     variantPredict[var].movingAverage2DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**2 + b * originalFitWindowSize + c) - (a * value**2 + b * value);
-
         # 3rd Degree Polynomial CURVE_FIT (3D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -794,7 +796,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage3D[timeScale][tickWindowIndex][value] = a * value**3 + b * value**2 + c * value + (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d);
                     variantPredict[var].movingAverage3DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d) - (a * value**3 + b * value**2 + c * value);
-
         # 4th Degree Polynomial CURVE_FIT (4D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -809,7 +810,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage4D[timeScale][tickWindowIndex][value] = a * value**4 + b * value**3 + c * value**2 + d * value + (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e);
                     variantPredict[var].movingAverage4DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e) - (a * value**4 + b * value**3 + c * value**2 + d * value);
-
         # 5th Degree Polynomial CURVE_FIT (5D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -825,25 +825,22 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingAverage5D[timeScale][tickWindowIndex][value] = a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value + (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f);
                     variantPredict[var].movingAverage5DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f) - (a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value);
-
+        
         # Plot 2nd Degree Polynomial CURVE_FIT (2D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage2D[timeScale][tickWindowIndex], linewidth=1, color='darkviolet', alpha=0.6); #plot simpleMovingAverage
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage2DInverted[timeScale][tickWindowIndex], linewidth=1, color='darkgoldenrod', alpha=0.6); #plot simpleMovingAverage
-                
         # Plot 3rd Degree Polynomial CURVE_FIT (3D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage3D[timeScale][tickWindowIndex], linewidth=1, color='thistle', alpha=0.2); #plot simpleMovingAverage
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage3DInverted[timeScale][tickWindowIndex], linewidth=1, color='gold', alpha=0.2); #plot simpleMovingAverage
-        
         # Plot 4th Degree Polynomial CURVE_FIT (4D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage4D[timeScale][tickWindowIndex], linewidth=1, color='thistle', alpha=0.2); #plot simpleMovingAverage
                 axs[2,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingAverage4DInverted[timeScale][tickWindowIndex], linewidth=1, color='gold', alpha=0.2); #plot simpleMovingAverage
-        
         # Plot 5th Degree Polynomial CURVE_FIT (5D) for BB
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -904,7 +901,6 @@ while t1Master-t0Master < t1MasterFin:
         ########################################################
         t0 = time.time();
         print('Predict Mean +/- SD for Peaks and Supports');
-        
         # Interpolated Collapsed Peaks and Supports Mean +/- SD
         for timeScale in range(len(variant_timeScales)):
             tempPeakIndeces = [i for i, x in enumerate(~np.isnan(variantData[var].staticPeaksCollapsedInterp[timeScale])) if x];
@@ -1070,7 +1066,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks2D[timeScale][tickWindowIndex][value] = a * value**2 + b * value + (a * originalFitWindowSize**2 + b * originalFitWindowSize + c);
                     variantPredict[var].movingPeaks2DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**2 + b * originalFitWindowSize + c) - (a * value**2 + b * value);
-
         # 3rd Degree Polynomial CURVE_FIT (3D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1084,7 +1079,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks3D[timeScale][tickWindowIndex][value] = a * value**3 + b * value**2 + c * value + (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d);
                     variantPredict[var].movingPeaks3DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d) - (a * value**3 + b * value**2 + c * value);
-
         # 4th Degree Polynomial CURVE_FIT (4D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1099,7 +1093,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks4D[timeScale][tickWindowIndex][value] = a * value**4 + b * value**3 + c * value**2 + d * value + (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e);
                     variantPredict[var].movingPeaks4DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e) - (a * value**4 + b * value**3 + c * value**2 + d * value);
-
         # 5th Degree Polynomial CURVE_FIT (5D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1115,7 +1108,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingPeaks5D[timeScale][tickWindowIndex][value] = a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value + (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f);
                     variantPredict[var].movingPeaks5DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**5 + b * originalFitWindowSize**4 + c * originalFitWindowSize**3 + d * originalFitWindowSize**2 + e * originalFitWindowSize + f) - (a * value**5 + b * value**4 + c * value**3 + d * value**2 + e * value);
-
         # 2nd Degree Polynomial CURVE_FIT (2D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1128,7 +1120,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports2D[timeScale][tickWindowIndex][value] = a * value**2 + b * value + (a * originalFitWindowSize**2 + b * originalFitWindowSize + c);
                     variantPredict[var].movingSupports2DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**2 + b * originalFitWindowSize + c) - (a * value**2 + b * value);
-
         # 3rd Degree Polynomial CURVE_FIT (3D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1142,7 +1133,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports3D[timeScale][tickWindowIndex][value] = a * value**3 + b * value**2 + c * value + (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d);
                     variantPredict[var].movingSupports3DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**3 + b * originalFitWindowSize**2 + c * originalFitWindowSize + d) - (a * value**3 + b * value**2 + c * value);
-        
         # 4th Degree Polynomial CURVE_FIT (4D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1157,7 +1147,6 @@ while t1Master-t0Master < t1MasterFin:
                 for value in range(0, originalFitWindowSize):
                     variantPredict[var].movingSupports4D[timeScale][tickWindowIndex][value] = a * value**4 + b * value**3 + c * value**2 + d * value + (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e);
                     variantPredict[var].movingSupports4DInverted[timeScale][tickWindowIndex][value] = (a * originalFitWindowSize**4 + b * originalFitWindowSize**3 + c * originalFitWindowSize**2 + d * originalFitWindowSize + e) - (a * value**4 + b * value**3 + c * value**2 + d * value);
-        
         # 5th Degree Polynomial CURVE_FIT (5D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1179,43 +1168,36 @@ while t1Master-t0Master < t1MasterFin:
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks2D[timeScale][tickWindowIndex], linewidth=1, color='violet', alpha=0.6); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks2DInverted[timeScale][tickWindowIndex], linewidth=1, color='goldenrod', alpha=0.6); #plot simpleMovingAverage
-        
         # Plot 3rd Degree Polynomial CURVE_FIT (3D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks3D[timeScale][tickWindowIndex], linewidth=1, color='thistle', alpha=0.2); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks3DInverted[timeScale][tickWindowIndex], linewidth=1, color='gold', alpha=0.2); #plot simpleMovingAverage
-        
         # Plot 4th Degree Polynomial CURVE_FIT (4D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks4D[timeScale][tickWindowIndex], linewidth=1, color='thistle', alpha=0.2); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks4DInverted[timeScale][tickWindowIndex], linewidth=1, color='gold', alpha=0.2); #plot simpleMovingAverage
-        
         # Plot 5th Degree Polynomial CURVE_FIT (5D) for Peaks
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks5D[timeScale][tickWindowIndex], linewidth=1, color='violet', alpha=0.6); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingPeaks5DInverted[timeScale][tickWindowIndex], linewidth=1, color='goldenrod', alpha=0.6); #plot simpleMovingAverage
-        
         # Plot 2nd Degree Polynomial CURVE_FIT (2D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingSupports2D[timeScale][tickWindowIndex], linewidth=1, color='darkviolet', alpha=0.6); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingSupports2DInverted[timeScale][tickWindowIndex], linewidth=1, color='darkgoldenrod', alpha=0.6); #plot simpleMovingAverage
-        
         # Plot 3rd Degree Polynomial CURVE_FIT (3D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingSupports3D[timeScale][tickWindowIndex], linewidth=1, color='thistle', alpha=0.2); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingSupports3DInverted[timeScale][tickWindowIndex], linewidth=1, color='gold', alpha=0.2); #plot simpleMovingAverage
-        
         # Plot 4th Degree Polynomial CURVE_FIT (4D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingSupports4D[timeScale][tickWindowIndex], linewidth=1, color='thistle', alpha=0.2); #plot simpleMovingAverage
                 axs[5,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].movingSupports4DInverted[timeScale][tickWindowIndex], linewidth=1, color='gold', alpha=0.2); #plot simpleMovingAverage
-        
         # Plot 5th Degree Polynomial CURVE_FIT (5D) for Supports
         for timeScale in range(len(variant_timeScales)):
             for tickWindowIndex in range(len(FIRTickWindows)):
@@ -1289,11 +1271,6 @@ while t1Master-t0Master < t1MasterFin:
                     focusedPSDFilteredHat[freq] = variantData[var].fPSDFilteredHat[timeScale][freq];
                     variantData[var].fIndepInverseValues[timeScale][freq] = np.fft.ifft(focusedPSDFilteredHat);
         
-        # Plot Debug Oscillation Noise Only
-        for timeScale in range(len(variant_timeScales)):
-            axs[7,timeScale].plot(variantData[var].debugoNoiseValues[timeScale], color='deepskyblue', alpha=0.8);
-            axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
-            axs[7,timeScale].set_ylim([np.min(variantData[var].debugoNoiseValues) - np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) *.5, np.max(variantData[var].debugoNoiseValues) + np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) * .5]);
         # Plot Independent Waves
         for timeScale in range(len(variant_timeScales)):
             indecesOfInterest = [i for i, x in enumerate(variantData[var].fBooleansOfInterest[timeScale]) if x];
@@ -1302,6 +1279,11 @@ while t1Master-t0Master < t1MasterFin:
                     axs[7,timeScale].plot(variantData[var].fIndepInverseValues[timeScale][freq], color='steelblue', alpha=0.8);
                     #axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
                     #axs[7,timeScale].set_ylim([np.nanmin(variantData[var].fIndepInverseValues) - np.nanstd([np.nanmin(variantData[var].fIndepInverseValues), np.nanmax(variantData[var].fIndepInverseValues)]) *.5, np.nanmax(variantData[var].fIndepInverseValues) + np.std([np.nanmin(variantData[var].fIndepInverseValues), np.nanmax(variantData[var].fIndepInverseValues)]) * .5]);
+        # Plot Debug Oscillation Noise Only
+        for timeScale in range(len(variant_timeScales)):
+            axs[7,timeScale].plot(variantData[var].debugoNoiseValues[timeScale], color='deepskyblue', alpha=0.8);
+            axs[7,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='debugO');
+            axs[7,timeScale].set_ylim([np.min(variantData[var].debugoNoiseValues) - np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) *.5, np.max(variantData[var].debugoNoiseValues) + np.std([np.min(variantData[var].debugoNoiseValues), np.max(variantData[var].debugoNoiseValues)]) * .5]);
         
         # Plot Collapsed Inverse Values
         for timeScale in range(len(variant_timeScales)):
@@ -1457,7 +1439,7 @@ while t1Master-t0Master < t1MasterFin:
                 axs[10,timeScale].plot(variantData[var].fInstPhase[timeScale][tickWindowIndex], color='teal', alpha=0.4); #plot simpleMovingAverage #plot simpleMovingAverage
                 axs[10,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='Hilbφ');
                 axs[10,timeScale].set_ylim([np.nanmin(variantData[var].fInstPhase[timeScale]) - np.nanstd([np.nanmin(variantData[var].fInstPhase[timeScale]), np.nanmax(variantData[var].fInstPhase[timeScale])]) *.5, np.nanmax(variantData[var].fInstPhase[timeScale]) + np.nanstd([np.nanmin(variantData[var].fInstPhase[timeScale]), np.nanmax(variantData[var].fInstPhase[timeScale])]) * .5]);
-            
+        
         # Plot Amplitude Envelope
         # for timeScale in range(len(variant_timeScales)):
         #     axs[10,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].fFIRFilteredValues[timeScale][tickWindowIndex], color='violet', alpha=0.4); #plot simpleMovingAverage
@@ -1480,6 +1462,27 @@ while t1Master-t0Master < t1MasterFin:
         if debugTimers == 1:
             print(str(t1-t0));
         
+        ########################################################
+        ## Predict Hilbert Transform (HILB)
+        ########################################################
+        t0 = time.time();
+        print('Predict Hilbert Transform (HILB)');
+        # Predict Instantaneous Phase by Repeating by x-axis
+        for timeScale in range(len(variant_timeScales)):
+            for tickWindowIndex in range(len(FIRTickWindows)):
+                tickWindowSize = FIRTickWindows[tickWindowIndex];
+                variantPredict[var].fInstPhase[timeScale][tickWindowIndex] = variantData[var].fInstPhase[timeScale][tickWindowIndex];
+        # Plot Predicted Hilbert Transform
+        for timeScale in range(len(variant_timeScales)):
+            for tickWindowIndex in range(len(FIRTickWindows)):
+                axs[10,timeScale].plot(np.arange(variant_tickWindows[0]+variant_tickWindowsPredict[0])[-variant_tickWindowsPredict[0]:], variantPredict[var].fInstPhase[timeScale][tickWindowIndex], color='violet', alpha=0.4); #plot simpleMovingAverage #plot simpleMovingAverage
+                axs[10,timeScale].set(xlabel=str(variant_timeScales[timeScale]) + ' min tick', ylabel='Hilbφ');
+                axs[10,timeScale].set_ylim([np.nanmin(variantData[var].fInstPhase[timeScale]) - np.nanstd([np.nanmin(variantData[var].fInstPhase[timeScale]), np.nanmax(variantData[var].fInstPhase[timeScale])]) *.5, np.nanmax(variantData[var].fInstPhase[timeScale]) + np.nanstd([np.nanmin(variantData[var].fInstPhase[timeScale]), np.nanmax(variantData[var].fInstPhase[timeScale])]) * .5]);
+        
+        t1 = time.time();
+        if debugTimers == 1:
+            print(str(t1-t0));
+            
         ########################################################
         ## Variant Plot
         ########################################################
